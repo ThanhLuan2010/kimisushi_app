@@ -6,35 +6,40 @@ import {
   Text,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { BrandColors } from '@/constants/theme';
 
 interface LoginFormProps {
-  onLogin: (phone: string, password: string) => Promise<boolean>;
+  onLogin: (username: string, password: string) => Promise<boolean>;
 }
 
 export function LoginForm({ onLogin }: LoginFormProps) {
-  const [phone, setPhone] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!phone.trim() || !password.trim()) {
+    if (!username.trim() || !password.trim()) {
       setError('Vui lòng nhập đầy đủ thông tin');
       return;
     }
     setError('');
     setLoading(true);
-    const ok = await onLogin(phone.trim(), password);
+    const ok = await onLogin(username.trim(), password);
     setLoading(false);
     if (!ok) setError('Tài khoản hoặc mật khẩu không đúng');
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {/* Logo area */}
       <View style={styles.logoArea}>
         <Text style={styles.logoEmoji}>🍣</Text>
@@ -45,16 +50,16 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       {/* Form */}
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Số điện thoại / Email</Text>
+          <Text style={styles.label}>Tên đăng nhập</Text>
           <TextInput
             style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="0901234567"
+            value={username}
+            onChangeText={setUsername}
+            placeholder="admin"
             placeholderTextColor={BrandColors.textMuted}
-            keyboardType="phone-pad"
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="username"
           />
         </View>
 
@@ -94,9 +99,9 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           }
         </Pressable>
 
-        <Text style={styles.hint}>Demo: Nhập bất kỳ SĐT & mật khẩu</Text>
+        <Text style={styles.hint}>Liên hệ quản trị viên để được cấp tài khoản</Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

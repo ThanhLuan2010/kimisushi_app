@@ -2,17 +2,22 @@ import React, { useState } from 'react';
 import {
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OnlineOrderCard } from '@/components/orders/online-order-card';
+import { OnlineOrderDetailModal } from '@/components/orders/online-order-detail-modal';
+import { CreateOnlineOrderModal } from '@/components/orders/create-online-order-modal';
 import { TimePickerModal } from '@/components/orders/time-picker-modal';
 import { BrandColors } from '@/constants/theme';
 import { useOrders } from '@/hooks/use-orders';
-import type { OnlineOrderStatus } from '@/types';
+import { ordersApi } from '@/services/api';
+import type { OnlineOrder, OnlineOrderStatus } from '@/types';
 
 type Tab = 'pending' | 'cooking' | 'done';
 
@@ -23,9 +28,11 @@ const TABS: { key: Tab; label: string; emoji: string }[] = [
 ];
 
 export default function OrdersScreen() {
-  const { pendingOrders, cookingOrders, doneOrders, acceptOrder, completeOrder } = useOrders();
+  const { pendingOrders, cookingOrders, doneOrders, acceptOrder, completeOrder, loading, refresh } = useOrders();
   const [activeTab, setActiveTab] = useState<Tab>('pending');
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OnlineOrder | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const tabData: Record<Tab, typeof pendingOrders> = {
     pending: pendingOrders,
@@ -36,7 +43,14 @@ export default function OrdersScreen() {
   const displayOrders = tabData[activeTab];
 
   const handleAccept = (id: string) => {
-    setAcceptingOrderId(id);
+    const order = pendingOrders.find(o => o.id === id);
+    const isAsap = !order || !order.pickupTime || order.pickupTime === 'asap';
+    if (isAsap) {
+      setAcceptingOrderId(id);
+    } else {
+      acceptOrder(id, 0);
+      setActiveTab('cooking');
+    }
   };
 
   const handleTimeConfirm = (minutes: number) => {
@@ -53,6 +67,9 @@ export default function OrdersScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Đơn hàng online</Text>
+          <Pressable onPress={() => setIsCreateOpen(true)} style={styles.addBtn} hitSlop={8}>
+            <Text style={{ fontSize: 16 }}>➕</Text>
+          </Pressable>
           {pendingOrders.length > 0 && (
             <View style={styles.urgentBadge}>
               <Text style={styles.urgentText}>{pendingOrders.length} chờ xử lý</Text>
@@ -72,7 +89,7 @@ export default function OrdersScreen() {
                 onPress={() => setActiveTab(tab.key)}
               >
                 <Text style={styles.tabEmoji}>{tab.emoji}</Text>
-                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]} numberOfLines={1}>
                   {tab.label}
                 </Text>
                 {count > 0 && (
@@ -91,6 +108,14 @@ export default function OrdersScreen() {
           keyExtractor={o => o.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refresh}
+              tintColor={BrandColors.brand}
+              colors={[BrandColors.brand]}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>
@@ -110,6 +135,7 @@ export default function OrdersScreen() {
               order={item}
               onAccept={activeTab === 'pending' ? handleAccept : undefined}
               onComplete={activeTab === 'cooking' ? completeOrder : undefined}
+              onPress={() => setSelectedOrder(item)}
             />
           )}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
@@ -121,6 +147,42 @@ export default function OrdersScreen() {
         visible={acceptingOrderId !== null}
         onClose={() => setAcceptingOrderId(null)}
         onConfirm={handleTimeConfirm}
+      />
+
+      {/* Order detail modal */}
+      <OnlineOrderDetailModal
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+        onAccept={handleAccept}
+        onComplete={completeOrder}
+      />
+
+      <CreateOnlineOrderModal
+        visible={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSubmit={async (data) => {
+          try {
+            await ordersApi.create({
+              type: 'order',
+              customerName: data.customerName,
+              customerPhone: data.customerPhone,
+              method: data.method,
+              address: data.address,
+              items: data.items,
+              total: data.total,
+              notes: data.notes,
+              pickupDate: data.pickupDate,
+              pickupTime: data.pickupTime,
+              status: 'neu',
+            });
+            Alert.alert('✅ Thành công', 'Đã đặt đơn online mới.');
+            refresh();
+            setIsCreateOpen(false);
+          } catch (e: any) {
+            Alert.alert('❌ Thất bại', 'Không thể tạo đơn online: ' + e.message);
+            throw e;
+          }
+        }}
       />
     </View>
   );
@@ -141,6 +203,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  addBtn: {
+    padding: 8,
+    backgroundColor: BrandColors.surfaceHighlight,
+    borderRadius: 8,
   },
   title: {
     fontSize: 22,
@@ -163,8 +230,8 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: 12,
+    gap: 6,
     marginBottom: 4,
   },
   tab: {
@@ -173,9 +240,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 2,
     borderRadius: 12,
     backgroundColor: BrandColors.surface,
-    gap: 4,
+    gap: 2,
     borderWidth: 1,
     borderColor: BrandColors.border,
   },
@@ -184,10 +252,10 @@ const styles = StyleSheet.create({
     borderColor: BrandColors.brand,
   },
   tabEmoji: {
-    fontSize: 14,
+    fontSize: 12,
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: BrandColors.textSecondary,
   },
@@ -197,8 +265,8 @@ const styles = StyleSheet.create({
   tabCount: {
     backgroundColor: BrandColors.surfaceHighlight,
     borderRadius: 10,
-    width: 18,
-    height: 18,
+    width: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -207,12 +275,12 @@ const styles = StyleSheet.create({
   },
   tabCountText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
   },
   listContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 130,
   },
   empty: {
     alignItems: 'center',

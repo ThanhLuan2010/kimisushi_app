@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { BrandColors } from '@/constants/theme';
@@ -11,13 +11,29 @@ interface OrderSummaryProps {
   onClose: () => void;
   onAddMore: () => void;
   onBill: () => void;
+  onAddCustomItem?: (name: string, price: number) => void;
+  onRemoveItem?: (menuItemId: string) => void;
 }
 
-export function OrderSummary({ visible, table, onClose, onAddMore, onBill }: OrderSummaryProps) {
-  if (!table?.currentOrder) return null;
+export function OrderSummary({ visible, table, onClose, onAddMore, onBill, onAddCustomItem, onRemoveItem }: OrderSummaryProps) {
+  const [isAddingFee, setIsAddingFee] = useState(false);
+  const [feeName, setFeeName] = useState('');
+  const [feePrice, setFeePrice] = useState('');
 
-  const items: OrderItem[] = table.currentOrder.items;
+  if (!table) return null;
+
+  const items: OrderItem[] = table.currentOrder?.items || [];
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  const handleAddFee = () => {
+    const price = parseFloat(feePrice.replace(',', '.'));
+    if (feeName && !isNaN(price) && onAddCustomItem) {
+      onAddCustomItem(feeName, price);
+      setIsAddingFee(false);
+      setFeeName('');
+      setFeePrice('');
+    }
+  };
 
   return (
     <BottomSheet visible={visible} onClose={onClose} heightFraction={0.75}>
@@ -25,7 +41,7 @@ export function OrderSummary({ visible, table, onClose, onAddMore, onBill }: Ord
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Bàn {table.number} – {table.zone}</Text>
-          <Text style={styles.sub}>{items.reduce((s, i) => s + i.quantity, 0)} món • {subtotal.toLocaleString('vi-VN')}đ</Text>
+          <Text style={styles.sub}>{items.reduce((s, i) => s + i.quantity, 0)} món • {subtotal.toLocaleString('de-DE')} €</Text>
         </View>
         <Pressable onPress={onClose} style={styles.closeBtn}>
           <Text style={styles.closeBtnText}>✕</Text>
@@ -43,7 +59,14 @@ export function OrderSummary({ visible, table, onClose, onAddMore, onBill }: Ord
                 {item.note && <Text style={styles.itemNote}>📝 {item.note}</Text>}
               </View>
               <Text style={styles.itemQty}>×{item.quantity}</Text>
-              <Text style={styles.itemPrice}>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</Text>
+              <View style={styles.itemPriceContainer}>
+                <Text style={styles.itemPrice}>{(item.price * item.quantity).toLocaleString('de-DE')} €</Text>
+                {item.category === 'Phí dịch vụ' && onRemoveItem && (
+                  <Pressable style={styles.removeItemBtn} hitSlop={8} onPress={() => onRemoveItem(item.menuItemId)}>
+                    <Text style={styles.removeItemBtnText}>✕</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           ))
         }
@@ -51,17 +74,46 @@ export function OrderSummary({ visible, table, onClose, onAddMore, onBill }: Ord
         <View style={styles.divider} />
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Tạm tính</Text>
-          <Text style={styles.totalValue}>{subtotal.toLocaleString('vi-VN')}đ</Text>
+          <Text style={styles.totalValue}>{subtotal.toLocaleString('de-DE')} €</Text>
         </View>
+
+        {!isAddingFee && onAddCustomItem && (
+          <Pressable style={styles.addFeeBtn} onPress={() => setIsAddingFee(true)}>
+            <Text style={styles.addFeeBtnText}>+ Thêm phí dịch vụ</Text>
+          </Pressable>
+        )}
+
+        {isAddingFee && onAddCustomItem && (
+          <View style={styles.feeInputContainer}>
+            <TextInput
+              style={styles.feeInput}
+              placeholder="Tên phí..."
+              placeholderTextColor={BrandColors.textMuted}
+              value={feeName}
+              onChangeText={setFeeName}
+            />
+            <TextInput
+              style={[styles.feeInput, styles.feePriceInput]}
+              placeholder="Giá (€)"
+              placeholderTextColor={BrandColors.textMuted}
+              keyboardType="numeric"
+              value={feePrice}
+              onChangeText={setFeePrice}
+            />
+            <Pressable style={styles.feeConfirmBtn} onPress={handleAddFee}>
+              <Text style={styles.feeConfirmBtnText}>Thêm</Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
 
       {/* Action buttons */}
       <View style={styles.actions}>
         <Pressable style={styles.btnSecondary} onPress={onAddMore}>
-          <Text style={styles.btnSecondaryText}>+ Gọi thêm</Text>
+          <Text style={styles.btnSecondaryText}>+ Gọi thêm món</Text>
         </Pressable>
         <Pressable style={styles.btnPrimary} onPress={onBill}>
-          <Text style={styles.btnPrimaryText}>💰 Tính tiền</Text>
+          <Text style={styles.btnPrimaryText}>💰 Thanh toán</Text>
         </Pressable>
       </View>
     </BottomSheet>
@@ -139,12 +191,32 @@ const styles = StyleSheet.create({
     minWidth: 28,
     textAlign: 'right',
   },
+  itemPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 80,
+    justifyContent: 'flex-end',
+  },
   itemPrice: {
     fontSize: 14,
     fontWeight: '700',
     color: BrandColors.brand,
-    minWidth: 80,
     textAlign: 'right',
+  },
+  removeItemBtn: {
+    padding: 2,
+    backgroundColor: BrandColors.dangerFaded,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeItemBtnText: {
+    color: BrandColors.danger,
+    fontSize: 10,
+    fontWeight: '700',
   },
   divider: {
     height: 1,
@@ -196,5 +268,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',
+  },
+  addFeeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  addFeeBtnText: {
+    color: BrandColors.brand,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  feeInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: BrandColors.surfaceHighlight,
+    borderRadius: 8,
+  },
+  feeInput: {
+    flex: 1,
+    backgroundColor: BrandColors.surface,
+    color: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: BrandColors.borderStrong,
+    fontSize: 14,
+  },
+  feePriceInput: {
+    flex: 0.6,
+  },
+  feeConfirmBtn: {
+    backgroundColor: BrandColors.brand,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  feeConfirmBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

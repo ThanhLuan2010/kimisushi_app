@@ -14,7 +14,8 @@ export type TableStatus = 'empty' | 'occupied' | 'reserved';
 
 export interface Table {
   id: string;
-  number: number;
+  /** Số bàn — có thể là số hoặc có chữ (ví dụ: 1, A1, VIP-2) */
+  number: string | number;
   zone: string;
   capacity: number;
   status: TableStatus;
@@ -47,7 +48,7 @@ export interface OrderItem {
 
 // ─── Menu ─────────────────────────────────────────────────────────────────────
 
-export type MenuCategory = 'sushi' | 'drink' | 'appetizer' | 'hot-dish';
+export type MenuCategory = string;
 
 export interface MenuItem {
   id: string;
@@ -57,6 +58,7 @@ export interface MenuItem {
   description?: string;
   imageEmoji: string;
   available: boolean;
+  minQty?: number;
 }
 
 // ─── Online Orders ────────────────────────────────────────────────────────────
@@ -68,6 +70,7 @@ export interface OnlineOrder {
   id: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   items: OrderItem[];
   total: number;
   deliveryType: DeliveryType;
@@ -78,6 +81,8 @@ export interface OnlineOrder {
   estimatedMinutes?: number;
   discountCode?: string;
   discountAmount?: number;
+  pickupDate?: string;
+  pickupTime?: string;
 }
 
 // ─── Reservations ─────────────────────────────────────────────────────────────
@@ -124,4 +129,17 @@ export interface DashboardStats {
   emptyTables: number;
   reservedTables: number;
   occupiedTables: number;
+}
+
+// ─── Combos ───────────────────────────────────────────────────────────────────
+
+export interface Combo {
+  id: string;
+  name: string;
+  subtitle?: string;
+  price: number;
+  oldPrice?: string;
+  tag?: string;
+  items?: string;
+  isVisible: boolean;
 }

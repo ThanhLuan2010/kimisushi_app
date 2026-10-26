@@ -1,46 +1,95 @@
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { Tabs } from 'expo-router';
+import { Image, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <NativeTabs
-      backgroundColor="#0D0D1A"
-      indicatorColor="#1A1A2E"
-      labelStyle={{
-        selected: { color: '#FF4D2E' },
-        default: { color: '#6B6B8A' },
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#FF4D2E',
+        tabBarInactiveTintColor: '#6B6B8A',
+        tabBarStyle: {
+          backgroundColor: '#0D0D1A',
+          borderTopWidth: 1,
+          borderTopColor: '#1A1A2E',
+          height: Platform.OS === 'ios' ? 88 : 68 + insets.bottom,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 12 + insets.bottom,
+          paddingTop: Platform.OS === 'ios' ? 0 : 6,
+        },
       }}
     >
-      <NativeTabs.Trigger name="dashboard">
-        <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color, size }) => (
+            <Image
+              source={require('@/assets/images/tabIcons/home.png')}
+              style={{ width: 22, height: 22, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
 
-      <NativeTabs.Trigger name="tables">
-        <NativeTabs.Trigger.Label>Bàn</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
+      <Tabs.Screen
+        name="tables"
+        options={{
+          title: 'Bàn',
+          tabBarIcon: ({ color, size }) => (
+            <Image
+              source={require('@/assets/images/tabIcons/explore.png')}
+              style={{ width: 22, height: 22, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
 
-      <NativeTabs.Trigger name="orders">
-        <NativeTabs.Trigger.Label>Đơn Online</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
+      <Tabs.Screen
+        name="menu"
+        options={{
+          title: 'Thực đơn',
+          tabBarIcon: ({ color }) => (
+            <Image
+              source={require('@/assets/images/tabIcons/explore.png')}
+              style={{ width: 22, height: 22, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
 
-      <NativeTabs.Trigger name="reservations">
-        <NativeTabs.Trigger.Label>Đặt bàn</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: 'Đơn Online',
+          tabBarIcon: ({ color, size }) => (
+            <Image
+              source={require('@/assets/images/tabIcons/home.png')}
+              style={{ width: 22, height: 22, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="reservations"
+        options={{
+          title: 'Đặt bàn',
+          tabBarIcon: ({ color, size }) => (
+            <Image
+              source={require('@/assets/images/tabIcons/explore.png')}
+              style={{ width: 22, height: 22, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }

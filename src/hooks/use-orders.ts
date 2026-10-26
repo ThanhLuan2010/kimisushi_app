@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { ordersApi, type ApiOrder } from '@/services/api';
 import type { OnlineOrder, OnlineOrderStatus, DeliveryType } from '@/types';
@@ -47,12 +47,17 @@ function apiToAppOrder(o: ApiOrder): OnlineOrder {
 export function useOrders() {
   const [orders, setOrders] = useState<OnlineOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const knownOrderIds = useRef<Set<string>>(new Set());
+  const isInitialFetch = useRef(true);
 
   const fetchOrders = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await ordersApi.getAll({ type: 'order' });
-      setOrders((res.items ?? []).map(apiToAppOrder));
+      const fetchedOrders = (res.items ?? []).map(apiToAppOrder);
+
+      console.log(`[useOrders] 📦 Fetched ${fetchedOrders.length} orders.`);
+      knownOrderIds.current = new Set(fetchedOrders.map(o => o.id));
+      setOrders(fetchedOrders);
     } catch (e: any) {
       console.warn('[useOrders] fetch error:', e.message);
     } finally {
@@ -64,7 +69,7 @@ export function useOrders() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // ─── Real-time: Refresh on Push Notification ────────────────────────────────
+  // ─── Real-time: Refresh khi nhận Push Notification ─────────────────────────
   useEffect(() => {
     const sub = addNotificationListener((notification) => {
       console.log('[useOrders] Push notification received, refreshing orders...');
@@ -72,6 +77,7 @@ export function useOrders() {
     });
     return () => { sub.remove(); };
   }, [fetchOrders]);
+
   // ─── Actions ─────────────────────────────────────────────────────────────────
   const acceptOrder = async (id: string, estimatedMinutes: number) => {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cooking' as OnlineOrderStatus, estimatedMinutes } : o));
@@ -79,10 +85,10 @@ export function useOrders() {
     await ordersApi.updateStatus(id, 'cooking', undefined, estimatedMinutes).catch(console.warn);
   };
 
-  const completeOrder = async (id: string) => {
+  const completeOrder = async (id: string, skipEmail?: boolean) => {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'done' as OnlineOrderStatus } : o));
     DeviceEventEmitter.emit('orderStatusChanged', { id, status: 'done' });
-    await ordersApi.updateStatus(id, 'done').catch(console.warn);
+    await ordersApi.updateStatus(id, 'done', undefined, undefined, skipEmail).catch(console.warn);
   };
 
   const cancelOrder = async (id: string) => {

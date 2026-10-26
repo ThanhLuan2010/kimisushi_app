@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { MenuItemCard } from '@/components/tables/menu-item-card';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
-import { MOCK_MENU } from '@/constants/mock-data';
 import { BrandColors } from '@/constants/theme';
+import { useMenu } from '@/hooks/use-menu';
+import { useCategories } from '@/hooks/use-categories';
 import type { MenuItem, MenuCategory, OrderItem, Table } from '@/types';
 
 interface MenuPanelProps {
@@ -24,26 +27,79 @@ interface MenuPanelProps {
   existingItems?: OrderItem[];
 }
 
-const CATEGORIES: { key: MenuCategory; label: string; emoji: string }[] = [
-  { key: 'sushi', label: 'Sushi', emoji: '🍣' },
-  { key: 'appetizer', label: 'Khai vị', emoji: '🥗' },
-  { key: 'hot-dish', label: 'Món nóng', emoji: '🍜' },
-  { key: 'drink', label: 'Nước uống', emoji: '🥤' },
-];
+const getCategoryEmoji = (category: string) => {
+  const cat = category.toLowerCase();
+  if (cat.includes('sushi') || cat.includes('roll')) return '🍣';
+  if (cat.includes('drink') || cat.includes('nước') || cat.includes('getränke')) return '🥤';
+  if (cat.includes('hot') || cat.includes('nóng') || cat.includes('soup') || cat.includes('suppe')) return '🍜';
+  if (cat.includes('appetizer') || cat.includes('khai vị') || cat.includes('vorspeise')) return '🥗';
+  if (cat.includes('box') || cat.includes('set')) return '🍱';
+  if (cat.includes('dessert') || cat.includes('tráng miệng')) return '🍨';
+  return '🍽️';
+};
 
 export function MenuPanel({ visible, table, onClose, onConfirm, existingItems }: MenuPanelProps) {
-  const [activeCategory, setActiveCategory] = useState<MenuCategory>('sushi');
+  const [activeCategory, setActiveCategory] = useState<MenuCategory>('');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [note, setNote] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { menu, loading: menuLoading } = useMenu();
+  const { categories, loading: categoriesLoading } = useCategories();
 
-  const filteredMenu = MOCK_MENU.filter(m => m.category === activeCategory && m.available);
+  // Map API categories to the format used in UI
+  const displayCategories = React.useMemo(() => {
+    return categories.map(c => ({
+      key: c.name,
+      label: c.name,
+      emoji: getCategoryEmoji(c.name),
+    }));
+  }, [categories]);
 
-  const handleAdd = (id: string) => setQuantities(q => ({ ...q, [id]: (q[id] ?? 0) + 1 }));
-  const handleRemove = (id: string) => setQuantities(q => ({ ...q, [id]: Math.max(0, (q[id] ?? 0) - 1) }));
+  // Set default category when categories load
+  React.useEffect(() => {
+    if (displayCategories.length > 0 && !activeCategory) {
+      setActiveCategory(displayCategories[0].key);
+    }
+  }, [displayCategories, activeCategory]);
+
+  // (If available is missing or false but we want to show everything during testing, we can check. For now rely on m.available ?? true)
+  const filteredMenu = React.useMemo(() => {
+    const availableMenu = menu.filter(m => m.available !== false);
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      return availableMenu.filter(m => 
+        m.name.toLowerCase().includes(query) || 
+        (m.description && m.description.toLowerCase().includes(query))
+      );
+    }
+    return availableMenu.filter(m => m.category === activeCategory);
+  }, [menu, activeCategory, searchQuery]);
+
+  const handleAdd = (id: string) => setQuantities(q => {
+    const item = menu.find(m => m.id === id);
+    const minQty = item?.minQty ? (typeof item.minQty === 'string' ? parseInt(item.minQty as any, 10) : item.minQty) : 1;
+    const current = q[id] ?? 0;
+    if (current === 0) {
+      return { ...q, [id]: minQty };
+    }
+    return { ...q, [id]: current + 1 };
+  });
+
+  const handleRemove = (id: string) => setQuantities(q => {
+    const item = menu.find(m => m.id === id);
+    const minQty = item?.minQty ? (typeof item.minQty === 'string' ? parseInt(item.minQty as any, 10) : item.minQty) : 1;
+    const current = q[id] ?? 0;
+    if (current <= minQty) {
+      const copy = { ...q };
+      delete copy[id];
+      return copy;
+    }
+    return { ...q, [id]: current - 1 };
+  });
 
   const totalItems = Object.values(quantities).reduce((s, v) => s + v, 0);
   const totalPrice = Object.entries(quantities).reduce((sum, [id, qty]) => {
-    const item = MOCK_MENU.find(m => m.id === id);
+    const item = menu.find(m => m.id === id);
     return sum + (item?.price ?? 0) * qty;
   }, 0);
 
@@ -51,24 +107,30 @@ export function MenuPanel({ visible, table, onClose, onConfirm, existingItems }:
     const selected = Object.entries(quantities)
       .filter(([, qty]) => qty > 0)
       .map(([id, quantity]) => ({
-        item: MOCK_MENU.find(m => m.id === id)!,
+        item: menu.find(m => m.id === id)!,
         quantity,
         note: note || undefined,
       }));
     onConfirm(selected);
     setQuantities({});
     setNote('');
+    setSearchQuery('');
   };
 
   const handleClose = () => {
     setQuantities({});
     setNote('');
+    setSearchQuery('');
     onClose();
   };
 
   return (
     <BottomSheet visible={visible} onClose={handleClose} heightFraction={0.88}>
-      {/* Header */}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>
@@ -83,29 +145,70 @@ export function MenuPanel({ visible, table, onClose, onConfirm, existingItems }:
         </Pressable>
       </View>
 
-      {/* Category tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll} contentContainerStyle={styles.catContent}>
-        {CATEGORIES.map(cat => (
-          <Pressable
-            key={cat.key}
-            style={[styles.catTab, activeCategory === cat.key && styles.catTabActive]}
-            onPress={() => setActiveCategory(cat.key)}
-          >
-            <Text style={styles.catEmoji}>{cat.emoji}</Text>
-            <Text style={[styles.catLabel, activeCategory === cat.key && styles.catLabelActive]}>
-              {cat.label}
-            </Text>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="🔍  Tìm kiếm món ăn..."
+          placeholderTextColor={BrandColors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {searchQuery.trim().length > 0 && (
+          <Pressable onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+            <Text style={styles.clearSearchBtnText}>✕</Text>
           </Pressable>
-        ))}
-      </ScrollView>
+        )}
+      </View>
 
       {/* Menu items */}
       <FlatList
-        data={filteredMenu}
+        data={menuLoading ? [] : filteredMenu}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
         style={styles.list}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={styles.catContainer}>
+            {categoriesLoading && displayCategories.length === 0 ? (
+              <ActivityIndicator color={BrandColors.brand} size="small" />
+            ) : (
+              displayCategories.map(cat => (
+                <Pressable
+                  key={cat.key}
+                  style={[styles.catTab, activeCategory === cat.key && styles.catTabActive]}
+                  onPress={() => {
+                    setActiveCategory(cat.key);
+                    setSearchQuery('');
+                  }}
+                >
+                  <Text style={styles.catEmoji}>{cat.emoji}</Text>
+                  <Text style={[styles.catLabel, activeCategory === cat.key && styles.catLabelActive]}>
+                    {cat.label}
+                  </Text>
+                </Pressable>
+              ))
+            )}
+          </View>
+        }
+        ListEmptyComponent={
+          menuLoading ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+              <ActivityIndicator color={BrandColors.brand} size="large" />
+              <Text style={{ color: BrandColors.textMuted, marginTop: 12, fontSize: 13 }}>Đang tải thực đơn...</Text>
+            </View>
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+              <Text style={{ fontSize: 32 }}>🍽️</Text>
+              <Text style={{ color: BrandColors.textMuted, marginTop: 8, fontSize: 14, fontWeight: '600' }}>
+                {searchQuery.trim() ? 'Không tìm thấy món ăn phù hợp' : 'Chưa có món trong danh mục này'}
+              </Text>
+            </View>
+          )
+        }
         renderItem={({ item }) => (
           <MenuItemCard
             item={item}
@@ -135,11 +238,12 @@ export function MenuPanel({ visible, table, onClose, onConfirm, existingItems }:
         <Pressable style={styles.confirmBar} onPress={handleConfirm}>
           <View style={styles.confirmInfo}>
             <Text style={styles.confirmCount}>{totalItems} món</Text>
-            <Text style={styles.confirmPrice}>{totalPrice.toLocaleString('vi-VN')}đ</Text>
+            <Text style={styles.confirmPrice}>{totalPrice.toLocaleString('de-DE')} €</Text>
           </View>
           <Text style={styles.confirmText}>Xác nhận gọi món →</Text>
         </Pressable>
-      )}
+        )}
+      </KeyboardAvoidingView>
     </BottomSheet>
   );
 }
@@ -178,14 +282,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  catScroll: {
-    maxHeight: 56,
-  },
-  catContent: {
+  searchContainer: {
     paddingHorizontal: 16,
-    gap: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: BrandColors.border,
+    flexDirection: 'row',
     alignItems: 'center',
+    position: 'relative',
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: BrandColors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BrandColors.border,
+    paddingLeft: 12,
+    paddingRight: 36,
     paddingVertical: 8,
+    color: '#fff',
+    fontSize: 14,
+  },
+  clearSearchBtn: {
+    position: 'absolute',
+    right: 28,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: BrandColors.surfaceHighlight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearSearchBtnText: {
+    color: BrandColors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  catContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingBottom: 12,
   },
   catTab: {
     flexDirection: 'row',

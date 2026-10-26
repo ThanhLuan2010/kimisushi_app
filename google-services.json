@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "523852925849",
+    "project_id": "kimisushi-f5b47",
+    "storage_bucket": "kimisushi-f5b47.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:523852925849:android:e0b684fc35cb3c93c32108",
+        "android_client_info": {
+          "package_name": "com.anonymous.kimisushi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFtI93971Q-sC5BzZyo5-9GeeeMOkr1Cc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

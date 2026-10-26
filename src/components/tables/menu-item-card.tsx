@@ -18,7 +18,7 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: MenuItemCardPr
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.desc} numberOfLines={1}>{item.description}</Text>
-        <Text style={styles.price}>{item.price.toLocaleString('vi-VN')}đ</Text>
+        <Text style={styles.price}>{item.price.toLocaleString('de-DE')} €</Text>
       </View>
       <View style={styles.controls}>
         {quantity > 0 && (

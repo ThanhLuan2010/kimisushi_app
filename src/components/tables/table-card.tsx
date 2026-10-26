@@ -33,8 +33,14 @@ export function TableCard({ table, onPress }: TableCardProps) {
       {/* Status dot */}
       <View style={[styles.statusDot, { backgroundColor: statusColor.border }]} />
 
-      {/* Table number */}
-      <Text style={styles.tableNumber}>{table.number}</Text>
+      {/* Table number — hỗ trợ alphanumeric */}
+      <Text
+        style={[styles.tableNumber, String(table.number).length > 3 && styles.tableNumberSmall]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {table.number}
+      </Text>
       <Text style={styles.zone}>{table.zone}</Text>
 
       {/* Capacity */}
@@ -57,8 +63,11 @@ export function TableCard({ table, onPress }: TableCardProps) {
       {table.status === 'occupied' && itemCount > 0 && (
         <Text style={styles.itemCount}>{itemCount} món</Text>
       )}
-      {table.status === 'reserved' && table.reservedTime && (
-        <Text style={styles.reservedTime}>📅 {table.reservedTime}</Text>
+      {table.status === 'reserved' && (
+        <>
+          {table.reservedFor && <Text style={styles.reservedFor} numberOfLines={1}>👤 {table.reservedFor}</Text>}
+          {table.reservedTime && <Text style={styles.reservedTime}>📅 {table.reservedTime}</Text>}
+        </>
       )}
     </Pressable>
   );
@@ -73,7 +82,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     position: 'relative',
-    minHeight: 140,
+    height: 150,
     justifyContent: 'center',
   },
   pressed: {
@@ -93,6 +102,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
     lineHeight: 36,
+  },
+  tableNumberSmall: {
+    fontSize: 20,
+    lineHeight: 24,
   },
   zone: {
     fontSize: 10,
@@ -134,9 +147,17 @@ const styles = StyleSheet.create({
     color: BrandColors.textSecondary,
     fontWeight: '500',
   },
+  reservedFor: {
+    fontSize: 11,
+    color: BrandColors.warning,
+    fontWeight: '700',
+    marginTop: 2,
+    textAlign: 'center',
+  },
   reservedTime: {
     fontSize: 11,
     color: BrandColors.warning,
     fontWeight: '600',
+    marginTop: 2,
   },
 });

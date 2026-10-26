@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
 import {
+  RefreshControl,
   FlatList,
   Pressable,
   StyleSheet,
   Text,
   View,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ReservationCard } from '@/components/reservations/reservation-card';
-import { MOCK_RESERVATIONS } from '@/constants/mock-data';
+import { ReservationDetailModal } from '@/components/reservations/reservation-detail-modal';
+import { CreateReservationModal } from '@/components/reservations/create-reservation-modal';
+import { useReservations } from '@/hooks/use-reservations';
 import { BrandColors } from '@/constants/theme';
+import { ordersApi } from '@/services/api';
 import type { Reservation, ReservationStatus } from '@/types';
 
 type Tab = 'pending' | 'confirmed' | 'today';
@@ -21,29 +26,27 @@ const TABS: { key: Tab; label: string; emoji: string }[] = [
   { key: 'today', label: 'Hôm nay', emoji: '📅' },
 ];
 
+import moment from 'moment';
+
 function isToday(isoDate: string) {
-  const d = new Date(isoDate);
-  const now = new Date();
-  return d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear();
+  return moment(isoDate).isSame(moment(), 'day');
 }
 
 export default function ReservationsScreen() {
-  const [reservations, setReservations] = useState<Reservation[]>(MOCK_RESERVATIONS);
+  const { reservations, loading, refresh, acceptReservation, cancelReservation } = useReservations();
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('pending');
-
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const pending = reservations.filter(r => r.status === 'pending');
   const confirmed = reservations.filter(r => r.status === 'confirmed');
   const today = reservations.filter(r => isToday(r.arrivalTime));
+  console.log("======today====", today)
 
   const tabData: Record<Tab, Reservation[]> = { pending, confirmed, today };
   const displayList = tabData[activeTab];
 
-  const handleConfirm = (id: string) => {
-    setReservations(prev =>
-      prev.map(r => r.id === id ? { ...r, status: 'confirmed' as ReservationStatus } : r),
-    );
+  const handleConfirm = (id: string, tableId?: string) => {
+    acceptReservation(id, tableId);
   };
 
   return (
@@ -52,6 +55,9 @@ export default function ReservationsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Đặt bàn</Text>
+          <Pressable onPress={() => setIsCreateOpen(true)} style={styles.addBtn} hitSlop={8}>
+            <Text style={{ fontSize: 16 }}>➕</Text>
+          </Pressable>
           {pending.length > 0 && (
             <View style={styles.pendingBadge}>
               <Text style={styles.pendingText}>{pending.length} chờ xác nhận</Text>
@@ -90,6 +96,7 @@ export default function ReservationsScreen() {
           keyExtractor={r => r.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>📋</Text>
@@ -100,11 +107,44 @@ export default function ReservationsScreen() {
             <ReservationCard
               reservation={item}
               onConfirm={item.status === 'pending' ? handleConfirm : undefined}
+              onPress={() => setSelectedReservation(item)}
             />
           )}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         />
       </SafeAreaView>
+
+      <ReservationDetailModal
+        reservation={selectedReservation}
+        onClose={() => setSelectedReservation(null)}
+        onConfirm={handleConfirm}
+      />
+
+      <CreateReservationModal
+        visible={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSubmit={async (data) => {
+          try {
+            await ordersApi.create({
+              type: 'reservation',
+              customerName: data.name,
+              customerPhone: data.phone,
+              guests: data.guests,
+              persons: data.guests,
+              date: data.date,
+              time: data.time,
+              notes: data.notes,
+              status: 'neu',
+            });
+            Alert.alert('✅ Thành công', 'Đã tạo đặt bàn mới.');
+            refresh();
+            setIsCreateOpen(false);
+          } catch (e: any) {
+            Alert.alert('❌ Thất bại', 'Không thể tạo đặt bàn: ' + e.message);
+            throw e;
+          }
+        }}
+      />
     </View>
   );
 }
@@ -124,6 +164,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  addBtn: {
+    padding: 8,
+    backgroundColor: BrandColors.surfaceHighlight,
+    borderRadius: 8,
   },
   title: {
     fontSize: 22,
@@ -146,8 +191,8 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: 12,
+    gap: 6,
     marginBottom: 4,
   },
   tab: {
@@ -156,10 +201,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     borderRadius: 12,
     backgroundColor: BrandColors.surface,
-    gap: 4,
+    gap: 2,
     borderWidth: 1,
     borderColor: BrandColors.border,
   },
@@ -168,7 +213,7 @@ const styles = StyleSheet.create({
     borderColor: BrandColors.brand,
   },
   tabEmoji: {
-    fontSize: 13,
+    fontSize: 12,
   },
   tabLabel: {
     fontSize: 11,
@@ -181,8 +226,8 @@ const styles = StyleSheet.create({
   tabCount: {
     backgroundColor: BrandColors.surfaceHighlight,
     borderRadius: 10,
-    width: 18,
-    height: 18,
+    width: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -191,12 +236,12 @@ const styles = StyleSheet.create({
   },
   tabCountText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
   },
   listContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 130,
   },
   empty: {
     alignItems: 'center',

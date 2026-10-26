@@ -9,6 +9,7 @@ interface OnlineOrderCardProps {
   order: OnlineOrder;
   onAccept?: (id: string) => void;
   onComplete?: (id: string) => void;
+  onPress?: () => void;
 }
 
 function formatTime(iso: string) {
@@ -20,11 +21,14 @@ function minutesAgo(iso: string) {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
 }
 
-export function OnlineOrderCard({ order, onAccept, onComplete }: OnlineOrderCardProps) {
+export function OnlineOrderCard({ order, onAccept, onComplete, onPress }: OnlineOrderCardProps) {
   const ago = minutesAgo(order.createdAt);
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+      onPress={onPress}
+    >
       {/* Header */}
       <View style={styles.cardHeader}>
         <View style={styles.customerInfo}>
@@ -50,14 +54,14 @@ export function OnlineOrderCard({ order, onAccept, onComplete }: OnlineOrderCard
       </View>
 
       {/* Address */}
-      {order.deliveryType === 'delivery' && order.address && (
+      {order.deliveryType === 'delivery' && !!order.address && (
         <Text style={styles.address}>📍 {order.address}</Text>
       )}
 
-      {order.note && <Text style={styles.note}>📝 {order.note}</Text>}
+      {!!order.note && <Text style={styles.note}>📝 {order.note}</Text>}
 
       {/* Estimated time */}
-      {order.estimatedMinutes && (
+      {!!order.estimatedMinutes && (
         <View style={styles.etaBadge}>
           <Text style={styles.etaText}>⏱ Dự kiến: {order.estimatedMinutes} phút</Text>
         </View>
@@ -66,7 +70,7 @@ export function OnlineOrderCard({ order, onAccept, onComplete }: OnlineOrderCard
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.total}>
-          {order.total.toLocaleString('vi-VN')}đ
+          {order.total.toLocaleString('de-DE')} €
         </Text>
         <View style={styles.actions}>
           {order.status === 'pending' && onAccept && (
@@ -92,7 +96,7 @@ export function OnlineOrderCard({ order, onAccept, onComplete }: OnlineOrderCard
           )}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

@@ -3,10 +3,12 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandColors } from '@/constants/theme';
 
@@ -26,6 +28,8 @@ export function BottomSheet({
   children,
   heightFraction = 0.6,
 }: BottomSheetProps) {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 24) : insets.bottom;
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -69,7 +73,11 @@ export function BottomSheet({
         <Animated.View
           style={[
             styles.sheet,
-            { height: SCREEN_HEIGHT * heightFraction, transform: [{ translateY }] },
+            {
+              height: SCREEN_HEIGHT * heightFraction + bottomPadding,
+              paddingBottom: bottomPadding,
+              transform: [{ translateY }],
+            },
           ]}
         >
           <View style={styles.handle} />

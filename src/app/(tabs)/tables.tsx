@@ -1,29 +1,29 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BillModal } from '@/components/tables/bill-modal';
 import { MenuPanel } from '@/components/tables/menu-panel';
 import { OrderSummary } from '@/components/tables/order-summary';
 import { TableGrid } from '@/components/tables/table-grid';
+import { TableAdminModal } from '@/components/tables/table-admin-modal';
 import { BrandColors } from '@/constants/theme';
 import { useTables } from '@/hooks/use-tables';
-import type { MenuItem, PaymentMethod, Table } from '@/types';
+import type { MenuItem, OrderItem, PaymentMethod, Table } from '@/types';
 
 type ActiveSheet = 'none' | 'menu' | 'summary' | 'bill';
 
 export default function TablesScreen() {
-  const { tables, emptyCount, occupiedCount, reservedCount, openTable, addItemToTable, closeTable } = useTables();
+  const { tables, emptyCount, occupiedCount, reservedCount, loading, refresh, openTable, addItemsToTable, closeTable, updateTableItems, removeItemFromTable } = useTables();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>('none');
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   const handleTablePress = (table: Table) => {
     setSelectedTable(table);
     if (table.status === 'empty') {
-      // Open table and show menu
-      openTable(table.id);
-      // Update selected table ref
-      setSelectedTable({ ...table, status: 'occupied' });
+      // Show menu directly, don't occupy until items are added
+      setSelectedTable(table);
       setActiveSheet('menu');
     } else if (table.status === 'occupied') {
       setActiveSheet('summary');
@@ -47,18 +47,25 @@ export default function TablesScreen() {
   };
 
   const handleMenuConfirm = (items: { item: MenuItem; quantity: number; note?: string }[]) => {
-    if (!selectedTable) return;
-    items.forEach(({ item, quantity, note }) => {
-      addItemToTable(selectedTable.id, item, quantity, note);
-    });
+    if (!selectedTable || items.length === 0) {
+      setActiveSheet('none');
+      return;
+    }
+    
+    addItemsToTable(selectedTable.id, items, selectedTable.status === 'empty');
     setActiveSheet('none');
   };
 
-  const handleBillConfirm = (_method: PaymentMethod, tableId: string) => {
-    closeTable(tableId);
-    setActiveSheet('none');
-    setSelectedTable(null);
-    Alert.alert('✅ Thanh toán thành công', 'Bàn đã được giải phóng.');
+  const handleBillConfirm = (_method: PaymentMethod, tableId: string, remainingItems?: OrderItem[] | null) => {
+    if (remainingItems && remainingItems.length > 0) {
+      updateTableItems(tableId, remainingItems);
+      Alert.alert('✅ Thanh toán thành công', 'Đã thanh toán phần của khách. Bàn vẫn còn các món chưa thanh toán.');
+    } else {
+      closeTable(tableId);
+      setActiveSheet('none');
+      setSelectedTable(null);
+      Alert.alert('✅ Thanh toán thành công', 'Bàn đã được giải phóng.');
+    }
   };
 
   const liveSelectedTable = selectedTable
@@ -70,7 +77,12 @@ export default function TablesScreen() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Sơ đồ bàn</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={styles.title}>Sơ đồ bàn</Text>
+            <Pressable onPress={() => setIsAdminOpen(true)} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 18 }}>⚙️</Text>
+            </Pressable>
+          </View>
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.dot, { backgroundColor: BrandColors.success }]} />
@@ -88,7 +100,12 @@ export default function TablesScreen() {
         </View>
 
         {/* Table grid */}
-        <TableGrid tables={tables} onTablePress={handleTablePress} />
+        <TableGrid
+          tables={tables}
+          onTablePress={handleTablePress}
+          refreshing={loading}
+          onRefresh={refresh}
+        />
       </SafeAreaView>
 
       {/* Menu panel */}
@@ -107,6 +124,22 @@ export default function TablesScreen() {
         onClose={() => setActiveSheet('none')}
         onAddMore={() => setActiveSheet('menu')}
         onBill={() => setActiveSheet('bill')}
+        onAddCustomItem={(name, price) => {
+          if (!liveSelectedTable || !liveSelectedTable.currentOrder) return;
+          const newItems = [...liveSelectedTable.currentOrder.items];
+          newItems.push({
+            menuItemId: `custom-${Date.now()}`,
+            name,
+            price,
+            quantity: 1,
+            category: 'Phí dịch vụ'
+          });
+          updateTableItems(liveSelectedTable.id, newItems);
+        }}
+        onRemoveItem={(menuItemId) => {
+          if (!liveSelectedTable) return;
+          removeItemFromTable(liveSelectedTable.id, menuItemId);
+        }}
       />
 
       {/* Bill modal */}
@@ -115,6 +148,12 @@ export default function TablesScreen() {
         table={liveSelectedTable}
         onClose={() => setActiveSheet('summary')}
         onConfirm={handleBillConfirm}
+      />
+
+      {/* Admin CRUD Modal */}
+      <TableAdminModal
+        visible={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
       />
     </View>
   );

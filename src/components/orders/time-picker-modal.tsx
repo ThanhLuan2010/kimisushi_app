@@ -5,7 +5,10 @@ import {
   Text,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { BrandColors } from '@/constants/theme';
@@ -21,6 +24,8 @@ const QUICK_TIMES = [10, 15, 20, 30];
 export function TimePickerModal({ visible, onClose, onConfirm }: TimePickerModalProps) {
   const [selected, setSelected] = useState<number | null>(null);
   const [custom, setCustom] = useState('');
+  
+  const insets = useSafeAreaInsets();
 
   const handleConfirm = () => {
     const minutes = selected ?? parseInt(custom, 10);
@@ -35,47 +40,52 @@ export function TimePickerModal({ visible, onClose, onConfirm }: TimePickerModal
 
   return (
     <BottomSheet visible={visible} onClose={onClose} heightFraction={0.46}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Thời gian chế biến</Text>
-        <Text style={styles.sub}>Khách sẽ nhận được thông báo thời gian chờ</Text>
+      <KeyboardAvoidingView 
+        style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.content}>
+          <Text style={styles.title}>Thời gian chế biến</Text>
+          <Text style={styles.sub}>Khách sẽ nhận được thông báo thời gian chờ</Text>
 
-        {/* Quick options */}
-        <View style={styles.quickRow}>
-          {QUICK_TIMES.map(mins => (
-            <Pressable
-              key={mins}
-              style={[styles.quickBtn, selected === mins && styles.quickBtnActive]}
-              onPress={() => {
-                setSelected(mins);
-                setCustom('');
+          {/* Quick options */}
+          <View style={styles.quickRow}>
+            {QUICK_TIMES.map(mins => (
+              <Pressable
+                key={mins}
+                style={[styles.quickBtn, selected === mins && styles.quickBtnActive]}
+                onPress={() => {
+                  setSelected(mins);
+                  setCustom('');
+                }}
+              >
+                <Text style={[styles.quickBtnText, selected === mins && styles.quickBtnTextActive]}>
+                  {mins}
+                </Text>
+                <Text style={[styles.quickBtnUnit, selected === mins && styles.quickBtnUnitActive]}>
+                  phút
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Custom input */}
+          <View style={styles.customRow}>
+            <Text style={styles.customLabel}>Tùy chỉnh:</Text>
+            <TextInput
+              style={[styles.customInput, custom.length > 0 && styles.customInputActive]}
+              value={custom}
+              onChangeText={v => {
+                setCustom(v);
+                setSelected(null);
               }}
-            >
-              <Text style={[styles.quickBtnText, selected === mins && styles.quickBtnTextActive]}>
-                {mins}
-              </Text>
-              <Text style={[styles.quickBtnUnit, selected === mins && styles.quickBtnUnitActive]}>
-                phút
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Custom input */}
-        <View style={styles.customRow}>
-          <Text style={styles.customLabel}>Tùy chỉnh:</Text>
-          <TextInput
-            style={[styles.customInput, custom.length > 0 && styles.customInputActive]}
-            value={custom}
-            onChangeText={v => {
-              setCustom(v);
-              setSelected(null);
-            }}
-            placeholder="?"
-            placeholderTextColor={BrandColors.textMuted}
-            keyboardType="number-pad"
-            maxLength={3}
-          />
-          <Text style={styles.customLabel}>phút</Text>
+              placeholder="?"
+              placeholderTextColor={BrandColors.textMuted}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+            <Text style={styles.customLabel}>phút</Text>
+          </View>
         </View>
 
         <Pressable
@@ -87,14 +97,19 @@ export function TimePickerModal({ visible, onClose, onConfirm }: TimePickerModal
             Xác nhận – {selected ?? (parseInt(custom) || '?')} phút
           </Text>
         </Pressable>
-      </View>
+      </KeyboardAvoidingView>
     </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    justifyContent: 'space-between',
+  },
+  content: {
     gap: 16,
   },
   title: {

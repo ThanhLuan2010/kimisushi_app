@@ -1,10 +1,17 @@
 import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+import { useAuth } from '@/hooks/use-auth';
 
-/**
- * Entry point: redirect directly to the main app tabs.
- * In a production app, this would check auth state and redirect accordingly.
- */
 export default function Index() {
-  // For demo purposes, go straight to dashboard (skip login)
-  return <Redirect href="/(tabs)/dashboard" />;
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0D0D1A', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#E8413E" />
+      </View>
+    );
+  }
+
+  return <Redirect href={isAuthenticated ? '/(tabs)/dashboard' : '/(auth)/login'} />;
 }

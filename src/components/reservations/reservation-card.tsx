@@ -8,11 +8,13 @@ import type { Reservation } from '@/types';
 interface ReservationCardProps {
   reservation: Reservation;
   onConfirm?: (id: string) => void;
+  onPress?: () => void;
 }
 
+import moment from 'moment';
+
 function formatArrival(iso: string) {
-  const d = new Date(iso);
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  return moment(iso).format('HH:mm');
 }
 
 const statusConfig = {
@@ -22,11 +24,11 @@ const statusConfig = {
   arrived: { label: 'Đã đến', variant: 'brand' as const },
 };
 
-export function ReservationCard({ reservation, onConfirm }: ReservationCardProps) {
+export function ReservationCard({ reservation, onConfirm, onPress }: ReservationCardProps) {
   const status = statusConfig[reservation.status];
 
   return (
-    <View style={styles.card}>
+    <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]} onPress={onPress}>
       <View style={styles.row}>
         {/* Left: Time */}
         <View style={styles.timeBlock}>
@@ -55,14 +57,14 @@ export function ReservationCard({ reservation, onConfirm }: ReservationCardProps
           {reservation.status === 'pending' && onConfirm && (
             <Pressable
               style={styles.confirmBtn}
-              onPress={() => onConfirm(reservation.id)}
+              onPress={(e) => { e.stopPropagation(); onPress?.(); }}
             >
-              <Text style={styles.confirmBtnText}>✓ Xác nhận</Text>
+              <Text style={styles.confirmBtnText}>🪑 Xếp bàn</Text>
             </Pressable>
           )}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

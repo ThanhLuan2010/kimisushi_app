@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ─── Config ──────────────────────────────────────────────────────────────────
 // IP máy Mac khi dev trên iPhone thật. Đổi thành domain khi deploy.
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://kimisushi-be.vercel.app';
+// process.env.EXPO_PUBLIC_API_URL || 'https://kimisushi-be.vercel.app';
 
 const API_URL = `${BASE_URL}/api`;
 const TOKEN_KEY = 'auth_token';
@@ -44,7 +45,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retries = 2
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       const errorMsg = body?.message || body?.error || `HTTP ${res.status}`;
-      
+
       // Tự động thử lại khi gặp lỗi Server hoặc kết nối Database trên Vercel
       if (retries > 0 && (res.status >= 500 || errorMsg.includes('Lỗi kết nối'))) {
         console.warn(`[API] Server error, retrying... (${retries} left)`, errorMsg);
@@ -188,10 +189,10 @@ export const ordersApi = {
     return apiFetch<{ success: boolean; count: number; items: ApiOrder[] }>(`/inbox${q}`);
   },
 
-  updateStatus: (id: string, status: string, tableId?: string, estimatedMinutes?: number) =>
+  updateStatus: (id: string, status: string, tableId?: string, estimatedMinutes?: number, skipEmail?: boolean) =>
     apiFetch<{ success: boolean }>(`/inbox/${id}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status, tableId, estimatedMinutes }),
+      body: JSON.stringify({ status, tableId, estimatedMinutes, skipEmail }),
     }),
 
   create: (data: Partial<ApiOrder>) =>
