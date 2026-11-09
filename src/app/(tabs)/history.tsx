@@ -54,7 +54,13 @@ export default function HistoryScreen() {
     const revenue = filteredHistory.reduce((sum, h) => sum + h.total, 0);
     const guests = filteredHistory.reduce((sum, h) => sum + (h.guests || 1), 0);
     const count = filteredHistory.length;
-    return { revenue, guests, count };
+    const cashTotal = filteredHistory
+      .filter(h => h.paymentMethod === 'cash')
+      .reduce((sum, h) => sum + h.total, 0);
+    const nonCashTotal = filteredHistory
+      .filter(h => h.paymentMethod !== 'cash')
+      .reduce((sum, h) => sum + h.total, 0);
+    return { revenue, guests, count, cashTotal, nonCashTotal };
   }, [filteredHistory]);
 
   return (
@@ -85,6 +91,22 @@ export default function HistoryScreen() {
             <Text style={styles.statValue}>👥 {stats.guests}</Text>
           </View>
         </View>
+
+        {/* Payment Breakdown */}
+        {stats.count > 0 && (
+          <View style={styles.breakdownRow}>
+            <View style={styles.breakdownItem}>
+              <Text style={styles.breakdownText}>
+                💵 Tiền mặt: <Text style={styles.breakdownBold}>{stats.cashTotal.toFixed(2).replace('.', ',')} €</Text>
+              </Text>
+            </View>
+            <View style={styles.breakdownItem}>
+              <Text style={styles.breakdownText}>
+                💳 Thẻ/QR/Khác: <Text style={styles.breakdownBold}>{stats.nonCashTotal.toFixed(2).replace('.', ',')} €</Text>
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Filter Pills */}
         <View style={styles.filtersWrapper}>
@@ -212,12 +234,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#161626',
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 8,
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#26263D',
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  breakdownText: {
+    color: BrandColors.textMuted,
+    fontSize: 12,
+  },
+  breakdownBold: {
+    color: '#fff',
+    fontWeight: '700',
   },
   statBox: {
     flex: 1,
