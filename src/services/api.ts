@@ -169,6 +169,9 @@ export interface ApiOrder {
   items: ApiOrderItem[];
   total: string;
   method: 'delivery' | 'pickup' | 'dine-in';
+  tableId?: string;
+  tableName?: string;
+  paymentMethod?: string;
   address?: string;
   notes?: string;
   status: string;
@@ -180,6 +183,7 @@ export interface ApiOrder {
   persons?: number;
   createdAt: string;
   updatedAt?: string;
+  completedAt?: string;
   estimatedMinutes?: number;
 }
 
@@ -199,6 +203,29 @@ export const ordersApi = {
     apiFetch<{ success: boolean; id: string }>('/inbox', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+};
+
+// ─── History API ──────────────────────────────────────────────────────────────
+export const historyApi = {
+  getAll: (params?: { method?: string; limit?: number }) => {
+    const queryParams: Record<string, string> = { status: 'done' };
+    if (params?.method) queryParams.method = params.method;
+    if (params?.limit) queryParams.limit = String(params.limit);
+    const q = '?' + new URLSearchParams(queryParams).toString();
+    return apiFetch<{ success: boolean; count: number; items: ApiOrder[] }>(`/inbox${q}`);
+  },
+
+  createDineInHistory: (data: Partial<ApiOrder>) =>
+    apiFetch<{ success: boolean; id: string }>('/inbox', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...data,
+        type: 'order',
+        method: 'dine-in',
+        status: 'done',
+        completedAt: new Date().toISOString(),
+      }),
     }),
 };
 

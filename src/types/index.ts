@@ -103,7 +103,28 @@ export interface Reservation {
 
 // ─── Bill / Payment ───────────────────────────────────────────────────────────
 
-export type PaymentMethod = 'cash' | 'qr' | 'ewallet';
+export type PaymentMethod = 'cash' | 'card' | 'qr' | 'ewallet';
+
+export interface OrderHistoryItem {
+  id: string;
+  type: 'order' | 'reservation';
+  method: 'dine-in' | 'delivery' | 'pickup';
+  tableId?: string;
+  tableName?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  guests?: number;
+  persons?: number;
+  items: OrderItem[];
+  total: number;
+  paymentMethod: PaymentMethod;
+  status: string;
+  address?: string;
+  notes?: string;
+  createdAt: string;
+  completedAt?: string;
+}
 
 export interface BillItem {
   name: string;

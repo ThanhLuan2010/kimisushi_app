@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BillModal } from '@/components/tables/bill-modal';
+import { BillModal, type BillPaymentInfo } from '@/components/tables/bill-modal';
 import { MenuPanel } from '@/components/tables/menu-panel';
 import { OrderSummary } from '@/components/tables/order-summary';
 import { TableGrid } from '@/components/tables/table-grid';
 import { TableAdminModal } from '@/components/tables/table-admin-modal';
 import { BrandColors } from '@/constants/theme';
 import { useTables } from '@/hooks/use-tables';
+import { historyApi } from '@/services/api';
 import type { MenuItem, OrderItem, PaymentMethod, Table } from '@/types';
 
 type ActiveSheet = 'none' | 'menu' | 'summary' | 'bill';
@@ -56,15 +57,52 @@ export default function TablesScreen() {
     setActiveSheet('none');
   };
 
-  const handleBillConfirm = (_method: PaymentMethod, tableId: string, remainingItems?: OrderItem[] | null) => {
+  const handleBillConfirm = async (
+    method: PaymentMethod,
+    tableId: string,
+    remainingItems?: OrderItem[] | null,
+    paymentInfo?: BillPaymentInfo
+  ) => {
+    const table = tables.find(t => t.id === tableId);
+    const tableName = table ? `Bàn ${table.number}` : `Bàn ${tableId}`;
+    const itemsToSave = paymentInfo?.paidItems || table?.currentOrder?.items || [];
+    const guestsNum = paymentInfo?.guests || table?.capacity || 2;
+    const totalAmount = paymentInfo?.total || (table?.currentOrder?.items.reduce((s, i) => s + i.price * i.quantity, 0) || 0);
+
+    // Tự động lưu lịch sử hoá đơn bàn tại quán vào hệ thống Backend
+    try {
+      await historyApi.createDineInHistory({
+        tableId,
+        tableName,
+        customerName: table?.reservedFor || tableName,
+        guests: guestsNum,
+        persons: guestsNum,
+        items: itemsToSave.map(i => ({
+          menuItemId: i.menuItemId,
+          name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+          note: i.note,
+          category: i.category,
+        })),
+        total: `${totalAmount.toFixed(2).replace('.', ',')} €`,
+        paymentMethod: method,
+        notes: paymentInfo?.note || table?.currentOrder?.note || '',
+        status: 'done',
+      });
+      console.log(`[Tables] 💾 Đã lưu lịch sử đơn bàn ${tableName} (${totalAmount} €) thành công.`);
+    } catch (err: any) {
+      console.warn('[Tables] ⚠️ Lỗi lưu lịch sử đơn bàn:', err?.message || err);
+    }
+
     if (remainingItems && remainingItems.length > 0) {
       updateTableItems(tableId, remainingItems);
-      Alert.alert('✅ Thanh toán thành công', 'Đã thanh toán phần của khách. Bàn vẫn còn các món chưa thanh toán.');
+      Alert.alert('✅ Thanh toán thành công', 'Đã lưu lịch sử và thanh toán phần của khách. Bàn vẫn còn các món chưa thanh toán.');
     } else {
       closeTable(tableId);
       setActiveSheet('none');
       setSelectedTable(null);
-      Alert.alert('✅ Thanh toán thành công', 'Bàn đã được giải phóng.');
+      Alert.alert('✅ Thanh toán thành công', 'Đã lưu lịch sử đơn và giải phóng bàn.');
     }
   };
 

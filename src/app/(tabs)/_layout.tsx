@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Image, Platform } from 'react-native';
+import { Image, Platform, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
@@ -87,6 +87,16 @@ export default function TabLayout() {
               style={{ width: 22, height: 22, tintColor: color }}
               resizeMode="contain"
             />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'Lịch sử',
+          tabBarIcon: ({ color }) => (
+            <Text style={{ fontSize: 18 }}>📜</Text>
           ),
         }}
       />

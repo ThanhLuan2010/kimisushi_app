@@ -140,6 +140,13 @@ export default function DashboardScreen() {
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.quickCard, pressed && styles.quickCardPressed]}
+                onPress={() => router.push('/(tabs)/history' as any)}
+              >
+                <Text style={styles.quickEmoji}>📜</Text>
+                <Text style={styles.quickLabel}>Lịch sử</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.quickCard, pressed && styles.quickCardPressed]}
                 onPress={async () => {
                   await triggerNewOrderNotification({
                     customerName: 'Khách thử nghiệm',

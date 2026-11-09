@@ -18,15 +18,29 @@ import type { OrderItem, PaymentMethod, Table } from '@/types';
 
 type SplitMode = 'none' | 'equal' | 'byItem';
 
+export interface BillPaymentInfo {
+  guests: number;
+  total: number;
+  paidItems: OrderItem[];
+  paymentMethod: PaymentMethod;
+  note?: string;
+}
+
 interface BillModalProps {
   visible: boolean;
   table: Table | null;
   onClose: () => void;
-  onConfirm: (method: PaymentMethod, tableId: string, remainingItems?: OrderItem[] | null) => void;
+  onConfirm: (
+    method: PaymentMethod,
+    tableId: string,
+    remainingItems?: OrderItem[] | null,
+    paymentInfo?: BillPaymentInfo
+  ) => void;
 }
 
 const PAYMENT_METHODS: { key: PaymentMethod; label: string; emoji: string }[] = [
   { key: 'cash', label: 'Tiền mặt', emoji: '💵' },
+  { key: 'card', label: 'Thẻ ngân hàng', emoji: '💳' },
   { key: 'qr', label: 'Chuyển khoản QR', emoji: '📲' },
   { key: 'ewallet', label: 'Ví điện tử', emoji: '📱' },
 ];
@@ -37,9 +51,17 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
   const [splitCount, setSplitCount] = useState('2');
   const [discountCode, setDiscountCode] = useState('');
   const [discountApplied, setDiscountApplied] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
+  const [guestsCount, setGuestsCount] = useState<string>('2');
   // State for split by item: map of menuItemId to quantity selected by the current person
   const [splitItemsByPerson, setSplitItemsByPerson] = useState<Record<number, Record<string, number>>>({ 1: {} });
   const [activePersonId, setActivePersonId] = useState(1);
+
+  React.useEffect(() => {
+    if (table) {
+      setGuestsCount(String(table.capacity || 2));
+    }
+  }, [table]);
   if (!table?.currentOrder) return null;
 
   const items: OrderItem[] = table.currentOrder.items;
@@ -91,7 +113,14 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
   };
 
   const handleConfirm = () => {
-    onConfirm('cash', table.id);
+    const guestsNum = parseInt(guestsCount, 10) || table.capacity || 2;
+    onConfirm(selectedPaymentMethod, table.id, null, {
+      guests: guestsNum,
+      total,
+      paidItems: items,
+      paymentMethod: selectedPaymentMethod,
+      note: table.currentOrder?.note,
+    });
     setSplitMode('none');
     setSplitCount('2');
     setDiscountCode('');
@@ -117,8 +146,18 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
       };
     }).filter(item => item.quantity > 0);
 
-    // Call onConfirm with remainingItems
-    onConfirm('cash', table.id, remainingItems);
+    const paidItemsForPerson: OrderItem[] = items.map(item => ({
+      ...item,
+      quantity: activePersonItems[item.menuItemId] || 0,
+    })).filter(item => item.quantity > 0);
+
+    // Call onConfirm with remainingItems and paymentInfo
+    onConfirm(selectedPaymentMethod, table.id, remainingItems, {
+      guests: 1,
+      total: splitByItemTotal,
+      paidItems: paidItemsForPerson,
+      paymentMethod: selectedPaymentMethod,
+    });
 
     // Update local state: remove active person's split items
     setSplitItemsByPerson(prev => {
@@ -280,6 +319,64 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
                 </View>
               </View>
             )}
+          </View>
+
+          {/* Guest Count & Payment Method */}
+          <View style={styles.section}>
+            <View style={styles.guestRow}>
+              <Text style={styles.sectionTitle}>👥 Số khách (Personen):</Text>
+              <View style={styles.qtyControl}>
+                <Pressable
+                  style={styles.qtyBtn}
+                  onPress={() => {
+                    const current = parseInt(guestsCount, 10) || 1;
+                    if (current > 1) setGuestsCount(String(current - 1));
+                  }}
+                >
+                  <Text style={styles.qtyBtnText}>-</Text>
+                </Pressable>
+                <Text style={styles.qtyValue}>{guestsCount}</Text>
+                <Pressable
+                  style={styles.qtyBtn}
+                  onPress={() => {
+                    const current = parseInt(guestsCount, 10) || 1;
+                    setGuestsCount(String(current + 1));
+                  }}
+                >
+                  <Text style={styles.qtyBtnText}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Text style={[styles.sectionTitle, { marginTop: 16, marginBottom: 10 }]}>
+              💳 Phương thức thanh toán:
+            </Text>
+            <View style={styles.paymentMethodsGrid}>
+              {PAYMENT_METHODS.map(m => {
+                const isSelected = selectedPaymentMethod === m.key;
+                return (
+                  <Pressable
+                    key={m.key}
+                    style={[
+                      styles.paymentMethodBtn,
+                      isSelected && styles.paymentMethodBtnSelected,
+                    ]}
+                    onPress={() => setSelectedPaymentMethod(m.key)}
+                  >
+                    <Text style={styles.paymentMethodEmoji}>{m.emoji}</Text>
+                    <Text
+                      style={[
+                        styles.paymentMethodLabel,
+                        isSelected && styles.paymentMethodLabelSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {m.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
           {/* Summary */}
@@ -669,6 +766,46 @@ const styles = StyleSheet.create({
   splitByItemResultValue: {
     color: BrandColors.success,
     fontSize: 16,
+    fontWeight: '700',
+  },
+  guestRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  paymentMethodsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  paymentMethodBtn: {
+    flex: 1,
+    minWidth: '45%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  paymentMethodBtnSelected: {
+    backgroundColor: 'rgba(255, 77, 46, 0.15)',
+    borderColor: BrandColors.brand,
+  },
+  paymentMethodEmoji: {
+    fontSize: 18,
+  },
+  paymentMethodLabel: {
+    color: BrandColors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  paymentMethodLabelSelected: {
+    color: '#fff',
     fontWeight: '700',
   },
 });
