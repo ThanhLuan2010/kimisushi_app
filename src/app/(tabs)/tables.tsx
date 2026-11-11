@@ -19,6 +19,7 @@ export default function TablesScreen() {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>('none');
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const isProcessingBillRef = React.useRef(false);
 
   const handleTablePress = (table: Table) => {
     setSelectedTable(table);
@@ -63,46 +64,52 @@ export default function TablesScreen() {
     remainingItems?: OrderItem[] | null,
     paymentInfo?: BillPaymentInfo
   ) => {
-    const table = tables.find(t => t.id === tableId);
-    const tableName = table ? `Bàn ${table.number}` : `Bàn ${tableId}`;
-    const itemsToSave = paymentInfo?.paidItems || table?.currentOrder?.items || [];
-    const guestsNum = paymentInfo?.guests || table?.capacity || 2;
-    const totalAmount = paymentInfo?.total || (table?.currentOrder?.items.reduce((s, i) => s + i.price * i.quantity, 0) || 0);
-
-    // Tự động lưu lịch sử hoá đơn bàn tại quán vào hệ thống Backend
+    if (isProcessingBillRef.current) return;
+    isProcessingBillRef.current = true;
     try {
-      await historyApi.createDineInHistory({
-        tableId,
-        tableName,
-        customerName: table?.reservedFor || tableName,
-        guests: guestsNum,
-        persons: guestsNum,
-        items: itemsToSave.map(i => ({
-          menuItemId: i.menuItemId,
-          name: i.name,
-          price: i.price,
-          quantity: i.quantity,
-          note: i.note,
-          category: i.category,
-        })),
-        total: `${totalAmount.toFixed(2).replace('.', ',')} €`,
-        paymentMethod: method,
-        notes: paymentInfo?.note || table?.currentOrder?.note || '',
-        status: 'done',
-      });
-      console.log(`[Tables] 💾 Đã lưu lịch sử đơn bàn ${tableName} (${totalAmount} €) thành công.`);
-    } catch (err: any) {
-      console.warn('[Tables] ⚠️ Lỗi lưu lịch sử đơn bàn:', err?.message || err);
-    }
+      const table = tables.find(t => t.id === tableId);
+      const tableName = table ? `Bàn ${table.number}` : `Bàn ${tableId}`;
+      const itemsToSave = paymentInfo?.paidItems || table?.currentOrder?.items || [];
+      const guestsNum = paymentInfo?.guests || table?.capacity || 2;
+      const totalAmount = paymentInfo?.total || (table?.currentOrder?.items.reduce((s, i) => s + i.price * i.quantity, 0) || 0);
 
-    if (remainingItems && remainingItems.length > 0) {
-      updateTableItems(tableId, remainingItems);
-      Alert.alert('✅ Thanh toán thành công', 'Đã lưu lịch sử và thanh toán phần của khách. Bàn vẫn còn các món chưa thanh toán.');
-    } else {
-      closeTable(tableId);
-      setActiveSheet('none');
-      setSelectedTable(null);
-      Alert.alert('✅ Thanh toán thành công', 'Đã lưu lịch sử đơn và giải phóng bàn.');
+      // Tự động lưu lịch sử hoá đơn bàn tại quán vào hệ thống Backend
+      try {
+        await historyApi.createDineInHistory({
+          tableId,
+          tableName,
+          customerName: table?.reservedFor || tableName,
+          guests: guestsNum,
+          persons: guestsNum,
+          items: itemsToSave.map(i => ({
+            menuItemId: i.menuItemId,
+            name: i.name,
+            price: i.price,
+            quantity: i.quantity,
+            note: i.note,
+            category: i.category,
+          })),
+          total: `${totalAmount.toFixed(2).replace('.', ',')} €`,
+          paymentMethod: method,
+          notes: paymentInfo?.note || table?.currentOrder?.note || '',
+          status: 'done',
+        });
+        console.log(`[Tables] 💾 Đã lưu lịch sử đơn bàn ${tableName} (${totalAmount} €) thành công.`);
+      } catch (err: any) {
+        console.warn('[Tables] ⚠️ Lỗi lưu lịch sử đơn bàn:', err?.message || err);
+      }
+
+      if (remainingItems && remainingItems.length > 0) {
+        updateTableItems(tableId, remainingItems);
+        Alert.alert('✅ Thanh toán thành công', 'Đã lưu lịch sử và thanh toán phần của khách. Bàn vẫn còn các món chưa thanh toán.');
+      } else {
+        closeTable(tableId);
+        setActiveSheet('none');
+        setSelectedTable(null);
+        Alert.alert('✅ Thanh toán thành công', 'Đã lưu lịch sử đơn và giải phóng bàn.');
+      }
+    } finally {
+      isProcessingBillRef.current = false;
     }
   };
 

@@ -18,11 +18,15 @@ interface HistoryDetailModalProps {
   onClose: () => void;
 }
 
-const PAYMENT_LABELS: Record<PaymentMethod, { label: string; emoji: string }> = {
-  cash: { label: 'Tiền mặt (Bar)', emoji: '💵' },
-  card: { label: 'Thẻ ngân hàng (Karte)', emoji: '💳' },
-  qr: { label: 'Chuyển khoản QR', emoji: '📲' },
-  ewallet: { label: 'Ví điện tử', emoji: '📱' },
+const PAYMENT_LABELS: Record<string, { label: string; emoji: string }> = {
+  cash: { label: 'Bar', emoji: '💵' },
+  bar: { label: 'Bar', emoji: '💵' },
+  card: { label: 'EC Karte', emoji: '💳' },
+  ec_card: { label: 'EC Karte', emoji: '💳' },
+  kreditkarte: { label: 'Kreditkarte', emoji: '💳' },
+  ewallet: { label: 'Kreditkarte', emoji: '💳' },
+  ueberweisung: { label: 'Überweisung', emoji: '🏦' },
+  qr: { label: 'Überweisung', emoji: '🏦' },
 };
 
 export function HistoryDetailModal({ visible, item, onClose }: HistoryDetailModalProps) {

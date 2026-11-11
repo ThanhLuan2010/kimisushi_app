@@ -8,11 +8,15 @@ interface HistoryCardProps {
   onPress: (item: OrderHistoryItem) => void;
 }
 
-const PAYMENT_CONFIG: Record<PaymentMethod, { label: string; emoji: string; color: string }> = {
-  cash: { label: 'Tiền mặt (Bar)', emoji: '💵', color: '#10B981' },
-  card: { label: 'Thẻ ngân hàng', emoji: '💳', color: '#3B82F6' },
-  qr: { label: 'Chuyển khoản QR', emoji: '📲', color: '#8B5CF6' },
-  ewallet: { label: 'Ví điện tử', emoji: '📱', color: '#EC4899' },
+const PAYMENT_CONFIG: Record<string, { label: string; emoji: string; color: string }> = {
+  cash: { label: 'Bar', emoji: '💵', color: '#10B981' },
+  bar: { label: 'Bar', emoji: '💵', color: '#10B981' },
+  card: { label: 'EC Karte', emoji: '💳', color: '#3B82F6' },
+  ec_card: { label: 'EC Karte', emoji: '💳', color: '#3B82F6' },
+  kreditkarte: { label: 'Kreditkarte', emoji: '💳', color: '#8B5CF6' },
+  ewallet: { label: 'Kreditkarte', emoji: '💳', color: '#8B5CF6' },
+  ueberweisung: { label: 'Überweisung', emoji: '🏦', color: '#F59E0B' },
+  qr: { label: 'Überweisung', emoji: '🏦', color: '#F59E0B' },
 };
 
 export function HistoryCard({ item, onPress }: HistoryCardProps) {

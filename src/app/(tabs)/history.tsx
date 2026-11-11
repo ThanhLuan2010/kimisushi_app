@@ -55,10 +55,10 @@ export default function HistoryScreen() {
     const guests = filteredHistory.reduce((sum, h) => sum + (h.guests || 1), 0);
     const count = filteredHistory.length;
     const cashTotal = filteredHistory
-      .filter(h => h.paymentMethod === 'cash')
+      .filter(h => h.paymentMethod === 'cash' || h.paymentMethod === 'bar')
       .reduce((sum, h) => sum + h.total, 0);
     const nonCashTotal = filteredHistory
-      .filter(h => h.paymentMethod !== 'cash')
+      .filter(h => h.paymentMethod !== 'cash' && h.paymentMethod !== 'bar')
       .reduce((sum, h) => sum + h.total, 0);
     return { revenue, guests, count, cashTotal, nonCashTotal };
   }, [filteredHistory]);
@@ -97,12 +97,12 @@ export default function HistoryScreen() {
           <View style={styles.breakdownRow}>
             <View style={styles.breakdownItem}>
               <Text style={styles.breakdownText}>
-                💵 Tiền mặt: <Text style={styles.breakdownBold}>{stats.cashTotal.toFixed(2).replace('.', ',')} €</Text>
+                💵 Bar: <Text style={styles.breakdownBold}>{stats.cashTotal.toFixed(2).replace('.', ',')} €</Text>
               </Text>
             </View>
             <View style={styles.breakdownItem}>
               <Text style={styles.breakdownText}>
-                💳 Thẻ/QR/Khác: <Text style={styles.breakdownBold}>{stats.nonCashTotal.toFixed(2).replace('.', ',')} €</Text>
+                💳 Karte/Überweisung: <Text style={styles.breakdownBold}>{stats.nonCashTotal.toFixed(2).replace('.', ',')} €</Text>
               </Text>
             </View>
           </View>

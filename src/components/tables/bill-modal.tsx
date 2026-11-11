@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,14 +36,14 @@ interface BillModalProps {
     tableId: string,
     remainingItems?: OrderItem[] | null,
     paymentInfo?: BillPaymentInfo
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 const PAYMENT_METHODS: { key: PaymentMethod; label: string; emoji: string }[] = [
-  { key: 'cash', label: 'Tiền mặt', emoji: '💵' },
-  { key: 'card', label: 'Thẻ ngân hàng', emoji: '💳' },
-  { key: 'qr', label: 'Chuyển khoản QR', emoji: '📲' },
-  { key: 'ewallet', label: 'Ví điện tử', emoji: '📱' },
+  { key: 'cash', label: 'Bar', emoji: '💵' },
+  { key: 'card', label: 'EC Karte', emoji: '💳' },
+  { key: 'kreditkarte', label: 'Kreditkarte', emoji: '💳' },
+  { key: 'ueberweisung', label: 'Überweisung', emoji: '🏦' },
 ];
 
 export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps) {
@@ -53,6 +54,7 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
   const [discountApplied, setDiscountApplied] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [guestsCount, setGuestsCount] = useState<string>('2');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // State for split by item: map of menuItemId to quantity selected by the current person
   const [splitItemsByPerson, setSplitItemsByPerson] = useState<Record<number, Record<string, number>>>({ 1: {} });
   const [activePersonId, setActivePersonId] = useState(1);
@@ -112,67 +114,87 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
     if (discountCode.toUpperCase() === 'KIMI10') setDiscountApplied(true);
   };
 
-  const handleConfirm = () => {
-    const guestsNum = parseInt(guestsCount, 10) || table.capacity || 2;
-    onConfirm(selectedPaymentMethod, table.id, null, {
-      guests: guestsNum,
-      total,
-      paidItems: items,
-      paymentMethod: selectedPaymentMethod,
-      note: table.currentOrder?.note,
-    });
-    setSplitMode('none');
-    setSplitCount('2');
-    setDiscountCode('');
-    setDiscountApplied(false);
-    setSplitItemsByPerson({ 1: {} });
-    setActivePersonId(1);
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const guestsNum = parseInt(guestsCount, 10) || table.capacity || 2;
+      await Promise.resolve(
+        onConfirm(selectedPaymentMethod, table.id, null, {
+          guests: guestsNum,
+          total,
+          paidItems: items,
+          paymentMethod: selectedPaymentMethod,
+          note: table.currentOrder?.note,
+        })
+      );
+      setSplitMode('none');
+      setSplitCount('2');
+      setDiscountCode('');
+      setDiscountApplied(false);
+      setSplitItemsByPerson({ 1: {} });
+      setActivePersonId(1);
+    } catch (err) {
+      console.error('[BillModal] Error confirming payment:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handlePayForActivePerson = () => {
+  const handlePayForActivePerson = async () => {
+    if (isSubmitting) return;
     const activePersonItems = splitItemsByPerson[activePersonId] || {};
     const hasSelectedItems = Object.values(activePersonItems).some(qty => qty > 0);
     if (!hasSelectedItems) {
-      Alert.alert('Thông báo', `Vui lòng chọn ít nhất 1 món cho Person ${activePersonId} để thanh toán.`);
+      Alert.alert('Hinweis', `Bitte wählen Sie mindestens einen Artikel für Person ${activePersonId} aus.`);
       return;
     }
 
-    // Calculate remaining items on the table
-    const remainingItems: OrderItem[] = items.map(item => {
-      const selectedQty = activePersonItems[item.menuItemId] || 0;
-      return {
+    setIsSubmitting(true);
+    try {
+      // Calculate remaining items on the table
+      const remainingItems: OrderItem[] = items.map(item => {
+        const selectedQty = activePersonItems[item.menuItemId] || 0;
+        return {
+          ...item,
+          quantity: item.quantity - selectedQty,
+        };
+      }).filter(item => item.quantity > 0);
+
+      const paidItemsForPerson: OrderItem[] = items.map(item => ({
         ...item,
-        quantity: item.quantity - selectedQty,
-      };
-    }).filter(item => item.quantity > 0);
+        quantity: activePersonItems[item.menuItemId] || 0,
+      })).filter(item => item.quantity > 0);
 
-    const paidItemsForPerson: OrderItem[] = items.map(item => ({
-      ...item,
-      quantity: activePersonItems[item.menuItemId] || 0,
-    })).filter(item => item.quantity > 0);
+      // Call onConfirm with remainingItems and paymentInfo
+      await Promise.resolve(
+        onConfirm(selectedPaymentMethod, table.id, remainingItems, {
+          guests: 1,
+          total: splitByItemTotal,
+          paidItems: paidItemsForPerson,
+          paymentMethod: selectedPaymentMethod,
+        })
+      );
 
-    // Call onConfirm with remainingItems and paymentInfo
-    onConfirm(selectedPaymentMethod, table.id, remainingItems, {
-      guests: 1,
-      total: splitByItemTotal,
-      paidItems: paidItemsForPerson,
-      paymentMethod: selectedPaymentMethod,
-    });
-
-    // Update local state: remove active person's split items
-    setSplitItemsByPerson(prev => {
-      const next = { ...prev };
-      delete next[activePersonId];
-      
-      const remainingPersonIds = Object.keys(next).map(Number);
-      if (remainingPersonIds.length > 0) {
-        setActivePersonId(remainingPersonIds[0]);
-        return next;
-      } else {
-        setActivePersonId(1);
-        return { 1: {} };
-      }
-    });
+      // Update local state: remove active person's split items
+      setSplitItemsByPerson(prev => {
+        const next = { ...prev };
+        delete next[activePersonId];
+        
+        const remainingPersonIds = Object.keys(next).map(Number);
+        if (remainingPersonIds.length > 0) {
+          setActivePersonId(remainingPersonIds[0]);
+          return next;
+        } else {
+          setActivePersonId(1);
+          return { 1: {} };
+        }
+      });
+    } catch (err) {
+      console.error('[BillModal] Error paying for person:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -324,7 +346,7 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
           {/* Guest Count & Payment Method */}
           <View style={styles.section}>
             <View style={styles.guestRow}>
-              <Text style={styles.sectionTitle}>👥 Số khách (Personen):</Text>
+              <Text style={styles.sectionTitle}>👥 Personen:</Text>
               <View style={styles.qtyControl}>
                 <Pressable
                   style={styles.qtyBtn}
@@ -349,7 +371,7 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
             </View>
 
             <Text style={[styles.sectionTitle, { marginTop: 16, marginBottom: 10 }]}>
-              💳 Phương thức thanh toán:
+              💳 Zahlungsmethode:
             </Text>
             <View style={styles.paymentMethodsGrid}>
               {PAYMENT_METHODS.map(m => {
@@ -402,12 +424,41 @@ export function BillModal({ visible, table, onClose, onConfirm }: BillModalProps
         {/* Confirm button */}
         <View style={[styles.footer, { paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 28) : Math.max(insets.bottom, 20) }]}>
           {splitMode === 'byItem' ? (
-            <Pressable style={[styles.confirmBtn, { backgroundColor: BrandColors.success }]} onPress={handlePayForActivePerson}>
-              <Text style={styles.confirmBtnText}>✓ Zahlung für Person {activePersonId} erhalten</Text>
+            <Pressable
+              style={[
+                styles.confirmBtn,
+                { backgroundColor: BrandColors.success },
+                isSubmitting && styles.confirmBtnDisabled,
+              ]}
+              onPress={handlePayForActivePerson}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <View style={styles.confirmBtnContent}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.confirmBtnText}>Wird gespeichert...</Text>
+                </View>
+              ) : (
+                <Text style={styles.confirmBtnText}>✓ Zahlung für Person {activePersonId} erhalten</Text>
+              )}
             </Pressable>
           ) : (
-            <Pressable style={styles.confirmBtn} onPress={handleConfirm}>
-              <Text style={styles.confirmBtnText}>✓ Zahlung erhalten • Tisch schließen</Text>
+            <Pressable
+              style={[
+                styles.confirmBtn,
+                isSubmitting && styles.confirmBtnDisabled,
+              ]}
+              onPress={handleConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <View style={styles.confirmBtnContent}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.confirmBtnText}>Wird gespeichert...</Text>
+                </View>
+              ) : (
+                <Text style={styles.confirmBtnText}>✓ Zahlung erhalten • Tisch schließen</Text>
+              )}
             </Pressable>
           )}
         </View>
@@ -641,6 +692,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 18,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnDisabled: {
+    opacity: 0.65,
+  },
+  confirmBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
   confirmBtnText: {
     fontSize: 16,

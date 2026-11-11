@@ -103,7 +103,7 @@ export interface Reservation {
 
 // ─── Bill / Payment ───────────────────────────────────────────────────────────
 
-export type PaymentMethod = 'cash' | 'card' | 'qr' | 'ewallet';
+export type PaymentMethod = 'cash' | 'card' | 'qr' | 'ewallet' | 'bar' | 'kreditkarte' | 'ueberweisung';
 
 export interface OrderHistoryItem {
   id: string;
